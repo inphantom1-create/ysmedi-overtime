@@ -3,14 +3,12 @@
    ============================================================ */
 const GAS_URL        = 'https://script.google.com/macros/s/AKfycbzjD764qLr-6V1L9v7xVmWJw9DSBHQ3AfWldlGHk6p5lfu84fV2n5SgFFIri-dCHsuymw/exec';
 const ADMIN_PASSWORD = '1234';
-
 const WORK_START  = timeToMin('08:30');
 const WORK_END    = timeToMin('17:30');
 const LUNCH_START = timeToMin('12:00');
 const LUNCH_END   = timeToMin('13:00');
 const DIN_START   = timeToMin('18:00');
 const DIN_END     = timeToMin('18:30');
-
 const DEFAULT_MEMBERS = [
   '하정열','강경민','오근탁','김지필','김민수','김동영','조재선','조웅제',
   '조성훈','오석순','김희원','양지유','배경순','김향란','진종민','박채영',
@@ -54,10 +52,64 @@ function getAttendance() {
 }
 
 /* ============================================================
-   GAS 통신 — 짧은 파라미터는 JSONP, 긴 데이터는 iframe POST
+   토/일/공휴일 여부 확인 (2025~2026 대체공휴일 포함)
    ============================================================ */
+function isWeekendOrHolidayJS(dateStr) {
+  if (!dateStr) return false;
+  const d   = new Date(dateStr);
+  const dow = d.getDay(); // 0=일, 6=토
+  if (dow === 0 || dow === 6) return true;
 
-/* 짧은 요청용 JSONP (조회, 삭제 등) */
+  const holidays = [
+    // 2025년 공휴일 + 대체공휴일
+    '2025-01-01',                          // 신정
+    '2025-01-28','2025-01-29','2025-01-30',// 설날 연휴
+    '2025-03-01',                          // 삼일절
+    '2025-05-01',                          // 노동절
+    '2025-05-05','2025-05-06',             // 어린이날 + 대체
+    '2025-06-06',                          // 현충일
+    '2025-08-15',                          // 광복절
+    '2025-10-03',                          // 개천절
+    '2025-10-06','2025-10-07','2025-10-08',// 추석 연휴
+    '2025-10-09',                          // 한글날
+    '2025-12-25',                          // 크리스마스
+    // 2026년 공휴일 + 대체공휴일
+    '2026-01-01',                          // 신정
+    '2026-01-28','2026-01-29','2026-01-30',// 설날 연휴
+    '2026-03-01','2026-03-02',             // 삼일절 + 대체
+    '2026-05-01',                          // 노동절
+    '2026-05-05',                          // 어린이날
+    '2026-05-24','2026-05-25',             // 부처님오신날 + 대체
+    '2026-06-03',                          // 지방선거일
+    '2026-06-06',                          // 현충일
+    '2026-07-17',                          // 제헌절
+    '2026-08-15','2026-08-17',             // 광복절 + 대체
+    '2026-09-24','2026-09-25','2026-09-26',// 추석 연휴
+    '2026-10-03','2026-10-05',             // 개천절 + 대체
+    '2026-10-09',                          // 한글날
+    '2026-12-25',                          // 크리스마스
+    // 2027년 공휴일 + 대체공휴일
+    '2027-01-01',                          // 신정
+    '2027-02-06','2027-02-07','2027-02-08','2027-02-09', // 설날 연휴 + 대체
+    '2027-03-01',                          // 삼일절
+    '2027-05-01',                          // 노동절(토) - 대체 5/3
+    '2027-05-03',                          // 노동절 대체공휴일
+    '2027-05-05',                          // 어린이날
+    '2027-05-13',                          // 부처님오신날
+    '2027-06-06',                          // 현충일(일) - 대체 없음
+    '2027-07-17',                          // 제헌절
+    '2027-08-15','2027-08-16',             // 광복절(일) + 대체(월)
+    '2027-09-14','2027-09-15','2027-09-16',// 추석 연휴
+    '2027-10-03','2027-10-04',             // 개천절(일) + 대체(월)
+    '2027-10-09','2027-10-11',             // 한글날(토) + 대체(월)
+    '2027-12-25','2027-12-27',             // 크리스마스(토) + 대체(월)
+  ];
+  return holidays.includes(dateStr);
+}
+
+/* ============================================================
+   GAS 통신 — JSONP
+   ============================================================ */
 function gasRequest(params, retryCount = 0) {
   return new Promise((resolve, reject) => {
     const cbName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
@@ -69,20 +121,16 @@ function gasRequest(params, retryCount = 0) {
         reject(new Error('요청 시간 초과'));
       }
     }, 30000);
-
     window[cbName] = (data) => { cleanup(); resolve(data); };
-
     function cleanup() {
       clearTimeout(timer);
       delete window[cbName];
       const el = document.getElementById(cbName);
       if (el) el.remove();
     }
-
     const qs = Object.entries({ ...params, callback: cbName })
       .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
       .join('&');
-
     const script = document.createElement('script');
     script.id = cbName;
     script.src = `${GAS_URL}?${qs}`;
@@ -98,7 +146,6 @@ function gasRequest(params, retryCount = 0) {
   });
 }
 
-/* 긴 데이터 전송용 — 숨겨진 폼 POST + JSONP 콜백 */
 function gasPostRequest(params, retryCount = 0) {
   return new Promise((resolve, reject) => {
     const cbName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
@@ -110,9 +157,7 @@ function gasPostRequest(params, retryCount = 0) {
         reject(new Error('요청 시간 초과'));
       }
     }, 30000);
-
     window[cbName] = (data) => { cleanup(); resolve(data); };
-
     function cleanup() {
       clearTimeout(timer);
       delete window[cbName];
@@ -121,23 +166,17 @@ function gasPostRequest(params, retryCount = 0) {
       if (f) f.remove();
       if (s) s.remove();
     }
-
-    // 숨겨진 iframe 생성
     const iframeName = 'gas_iframe_' + cbName;
     const iframe = document.createElement('iframe');
     iframe.name  = iframeName;
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
-    // 숨겨진 폼 생성
     const form = document.createElement('form');
     form.id     = 'gas-form-' + cbName;
     form.method = 'POST';
     form.action = GAS_URL;
     form.target = iframeName;
     form.style.display = 'none';
-
-    // 파라미터 + 콜백 추가
     const allParams = { ...params, callback: cbName };
     Object.entries(allParams).forEach(([k, v]) => {
       const input = document.createElement('input');
@@ -146,14 +185,9 @@ function gasPostRequest(params, retryCount = 0) {
       input.value = String(v);
       form.appendChild(input);
     });
-
     document.body.appendChild(form);
     form.submit();
-
-    // iframe 응답 대기 (JSONP 콜백으로 처리)
-    iframe.onload = () => {
-      // iframe 로드 후 콜백이 실행되므로 별도 처리 불필요
-    };
+    iframe.onload = () => {};
   });
 }
 
@@ -231,6 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(id).addEventListener('change', calcOvertime));
   document.querySelectorAll('input[name="attendance"]').forEach(r =>
     r.addEventListener('change', calcOvertime));
+  // 날짜 변경 시 재계산 (토/일/공휴일 여부 반영)
+  document.getElementById('work-date').addEventListener('change', calcOvertime);
   document.getElementById('reason').addEventListener('input', () => {
     document.getElementById('char-count').textContent =
       `${document.getElementById('reason').value.length} / 500`;
@@ -241,12 +277,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ============================================================
    시간외 근무 자동 계산
+   토/일/공휴일이면 시외 = 총근무시간 전체
    ============================================================ */
 function calcOvertime() {
   const startVal   = document.getElementById('start-time').value;
   const endVal     = document.getElementById('end-time').value;
   const hasDinner  = document.getElementById('dinner').checked;
   const attendance = getAttendance();
+  const workDate   = document.getElementById('work-date').value;
 
   document.getElementById('dinner-row').style.display = hasDinner ? 'flex' : 'none';
 
@@ -258,11 +296,13 @@ function calcOvertime() {
     attRow.style.display = 'none';
   }
 
+  // 연차 선택 시 근무시간 0으로 처리
   if (attendance === '연차') {
     document.getElementById('actual-display').textContent   = '0시간 0분';
     document.getElementById('overtime-display').textContent = '0시간 0분';
     window._actualLabel   = '0시간 0분';
     window._overtimeLabel = '0시간 0분';
+    document.getElementById('reason').placeholder = '연차';
     return;
   }
 
@@ -290,12 +330,23 @@ function calcOvertime() {
   const dinnerDeduct = hasDinner ? overlap(s, e, DIN_START, DIN_END) : 0;
   const actualWork   = Math.max(0, totalWork - lunchDeduct - dinnerDeduct);
   const basePure     = baseWork - lunchDeduct;
-  const overtime     = Math.max(0, actualWork - basePure);
+
+  // 토/일/공휴일이면 시외 = 총근무시간 전체
+  const isWkndHol = isWeekendOrHolidayJS(workDate);
+  const overtime  = isWkndHol ? actualWork : Math.max(0, actualWork - basePure);
 
   document.getElementById('actual-display').textContent   = minToLabel(actualWork);
   document.getElementById('overtime-display').textContent = minToLabel(overtime);
   window._overtimeLabel = minToLabel(overtime);
   window._actualLabel   = minToLabel(actualWork);
+
+  // placeholder 설정
+  const reasonEl = document.getElementById('reason');
+  if (overtime > 0) {
+    reasonEl.placeholder = '시외 근무 사유를 입력해 주세요.';
+  } else {
+    reasonEl.placeholder = '정규 근무 / 시외 근무 사유를 입력해 주세요.';
+  }
 }
 
 /* ============================================================
@@ -347,10 +398,9 @@ function clearError(errId, inputId) {
 }
 
 /* ============================================================
-   신청 제출 — submitWithCheck (JSONP, 짧은 사유는 OK)
-   긴 사유는 URL 잘림 방지를 위해 사유를 50자로 제한
+   신청 제출
    ============================================================ */
-let _isSubmitting  = false;
+let _isSubmitting   = false;
 let _pendingPayload = null;
 let _dupRowIndex    = null;
 
@@ -358,9 +408,7 @@ async function submitForm() {
   const btn = document.getElementById('btn-submit');
   if (btn.disabled) return;
   btn.disabled = true;
-
   if (!validateForm()) { btn.disabled = false; return; }
-
   const payload = {
     action:     'submitWithCheck',
     name:       document.getElementById('name').value,
@@ -375,13 +423,10 @@ async function submitForm() {
     reason:     document.getElementById('reason').value.trim(),
     appliedAt:  getNowISO(),
   };
-
   _isSubmitting = true;
   setLoading(true, '신청 중...');
-
   try {
     const result = await gasRequest(payload);
-
     if (result && result.duplicate) {
       _pendingPayload = payload;
       _dupRowIndex    = result.rowIndex;
@@ -394,7 +439,6 @@ async function submitForm() {
       document.getElementById('dup-modal-overlay').style.display = 'flex';
       return;
     }
-
     if (result && result.success) {
       showToast('✅ 신청이 완료되었습니다.', 'success');
       resetForm();
@@ -402,7 +446,6 @@ async function submitForm() {
       showToast('❌ 오류: ' + ((result && result.error) || '알 수 없는 오류'), 'error');
     }
     setLoading(false); _isSubmitting = false;
-
   } catch(err) {
     if (err.message.includes('시간 초과')) {
       showToast('⚠️ 응답이 느립니다. 저장은 완료됐을 수 있어요.', '', 5000);
@@ -427,9 +470,7 @@ async function confirmOverwrite() {
   const payload  = _pendingPayload;
   const rowIndex = _dupRowIndex;
   _pendingPayload = null; _dupRowIndex = null;
-
   setLoading(true, '기존 데이터 삭제 중...'); _isSubmitting = true;
-
   try {
     const delResult = await gasRequest({
       action:   'deleteRow',
