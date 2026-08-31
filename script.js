@@ -195,15 +195,28 @@ function gasPostRequest(params, retryCount = 0) {
 /* ============================================================
    신청인 목록 관리
    ============================================================ */
-function getMembers() {
-  try { const s = localStorage.getItem('overtime_members'); if (s) return JSON.parse(s); } catch(e) {}
-  return [...DEFAULT_MEMBERS];
+/* ============================================================
+   신청인 목록 관리 — 구글 스프레드시트 연동
+   ============================================================ */
+let _memberCache = null;
+
+async function fetchMembers() {
+  if (_memberCache) return _memberCache;
+  try {
+    const result = await gasRequest({ action: 'getMembers' });
+    if (result && result.success && result.members) {
+      _memberCache = result.members;
+    } else {
+      _memberCache = DEFAULT_MEMBERS.map(m => ({ name: m, job: '' }));
+    }
+  } catch(e) {
+    _memberCache = DEFAULT_MEMBERS.map(m => ({ name: m, job: '' }));
+  }
+  return _memberCache;
 }
-function saveMembers(list) {
-  try { localStorage.setItem('overtime_members', JSON.stringify(list)); } catch(e) {}
-}
-function refreshNameSelect() {
-  const members = getMembers();
+
+async function refreshNameSelect() {
+  const members = await fetchMembers();
   ['name','filter-name'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -213,45 +226,78 @@ function refreshNameSelect() {
       : '<option value="">-- 이름 선택 --</option>';
     members.forEach(m => {
       const opt = document.createElement('option');
-      opt.value = m; opt.textContent = m;
+      const name = typeof m === 'string' ? m : m.name;
+      opt.value = name; opt.textContent = name;
       sel.appendChild(opt);
     });
     sel.value = cur;
   });
 }
-function renderMemberList() {
-  const members = getMembers();
+
+async function renderMemberList() {
   const wrap = document.getElementById('member-list');
   if (!wrap) return;
+  wrap.innerHTML = '<div style="padding:12px;text-align:center;color:#999">조회 중...</div>';
+  const members = await fetchMembers();
   if (!members.length) {
     wrap.innerHTML = '<div class="no-data" style="border:none;padding:20px 0;">등록된 신청인이 없습니다.</div>';
     return;
   }
-  wrap.innerHTML = members.map((m,i) => `
-    <div class="member-item">
-      <span class="member-name">${i+1}. ${m}</span>
-      <button class="btn-delete-member" onclick="deleteMember(${i})">삭제</button>
-    </div>`).join('');
+  wrap.innerHTML = members.map((m, i) => {
+    const name = typeof m === 'string' ? m : m.name;
+    const job  = typeof m === 'object' ? (m.job || '') : '';
+    return `<div class="member-item">
+      <span class="member-name">${i+1}. ${name} <span style="color:#999;font-size:12px;">${job}</span></span>
+      <button class="btn-delete-member" onclick="deleteMember('${name}')">삭제</button>
+    </div>`;
+  }).join('');
 }
-function addMember() {
+
+async function addMember() {
   const input = document.getElementById('new-member');
   const errEl = document.getElementById('err-member');
   const name  = input.value.trim();
   if (!name) { errEl.textContent = '이름을 입력해 주세요.'; return; }
-  const members = getMembers();
-  if (members.includes(name)) { errEl.textContent = '이미 등록된 이름입니다.'; return; }
-  members.push(name); saveMembers(members);
-  input.value = ''; errEl.textContent = '';
-  renderMemberList(); refreshNameSelect();
-  showToast(`✅ "${name}" 추가되었습니다.`, 'success');
+  try {
+    const result = await gasRequest({
+      action:   'addMember',
+      password: ADMIN_PASSWORD,
+      name:     name,
+      job:      '',
+    });
+    if (result && result.success) {
+      _memberCache = null;
+      input.value = ''; errEl.textContent = '';
+      await renderMemberList();
+      await refreshNameSelect();
+      showToast(`✅ "${name}" 추가되었습니다.`, 'success');
+    } else {
+      errEl.textContent = (result && result.error) || '추가 실패';
+    }
+  } catch(e) {
+    errEl.textContent = '오류: ' + e.message;
+  }
 }
-function deleteMember(index) {
-  const members = getMembers();
-  const name = members[index];
+
+async function deleteMember(name) {
   if (!confirm(`"${name}"을(를) 삭제할까요?`)) return;
-  members.splice(index, 1); saveMembers(members);
-  renderMemberList(); refreshNameSelect();
-  showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
+  try {
+    const result = await gasRequest({
+      action:   'deleteMember',
+      password: ADMIN_PASSWORD,
+      name:     name,
+    });
+    if (result && result.success) {
+      _memberCache = null;
+      await renderMemberList();
+      await refreshNameSelect();
+      showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
+    } else {
+      showToast('삭제 실패: ' + ((result && result.error) || '오류'), 'error');
+    }
+  } catch(e) {
+    showToast('오류: ' + e.message, 'error');
+  }
 }
 
 /* ============================================================
@@ -260,7 +306,8 @@ function deleteMember(index) {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('today-date').textContent = getTodayLabel();
   document.getElementById('work-date').value = getTodayKST();
-  refreshNameSelect();
+  refreshNameSelect(); // 비동기 — GAS에서 신청인 목록 조회
+  document.getElementById('work-date').addEventListener('change', calcOvertime);
   document.getElementById('btn-submit').addEventListener('click', submitForm);
   ['start-time','end-time','dinner'].forEach(id =>
     document.getElementById(id).addEventListener('change', calcOvertime));
@@ -298,12 +345,13 @@ function calcOvertime() {
   }
 
   // 연차 선택 시 근무시간 0으로 처리
-  if (attendance === '연차') {
+  // 연차/교육/예비군: 근무시간 0 처리
+  if (attendance === '연차' || attendance === '교육' || attendance === '예비군') {
     document.getElementById('actual-display').textContent   = '0시간 0분';
     document.getElementById('overtime-display').textContent = '0시간 0분';
     window._actualLabel   = '0시간 0분';
     window._overtimeLabel = '0시간 0분';
-    document.getElementById('reason').placeholder = '연차';
+    document.getElementById('reason').placeholder = attendance;
     return;
   }
 
