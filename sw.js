@@ -1,11 +1,9 @@
 /* ============================================================
    서비스워커 (PWA 오프라인 캐싱)
    sw.js
-
    캐싱 전략: Cache First (정적 자산) + Network First (API)
    ============================================================ */
-
-const CACHE_NAME = 'overtime-v3.0.0';
+const CACHE_NAME = 'overtime-v5.0.0'; // ← 버전 업 → 모든 사용자 캐시 초기화
 
 /** 캐싱할 정적 파일 목록 */
 const STATIC_ASSETS = [
@@ -41,13 +39,11 @@ self.addEventListener('activate', event => {
 /* ── 패치: 캐시 우선, API는 네트워크 우선 ── */
 self.addEventListener('fetch', event => {
   const url = event.request.url;
-
   // Google Apps Script API 호출은 항상 네트워크
   if (url.includes('script.google.com')) {
     event.respondWith(fetch(event.request));
     return;
   }
-
   // 정적 자산: 캐시 우선
   event.respondWith(
     caches.match(event.request)
