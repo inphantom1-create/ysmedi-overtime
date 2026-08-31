@@ -3,7 +3,7 @@
    sw.js
    캐싱 전략: Cache First (정적 자산) + Network First (API)
    ============================================================ */
-const CACHE_NAME = 'overtime-v5.0.0'; // ← 버전 업 → 모든 사용자 캐시 초기화
+const CACHE_NAME = 'overtime-v6.0.0'; // ← 버전 업 → 모든 사용자 캐시 초기화
 
 /** 캐싱할 정적 파일 목록 */
 const STATIC_ASSETS = [
