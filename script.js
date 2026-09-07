@@ -315,14 +315,19 @@ document.addEventListener('DOMContentLoaded', () => {
   buildTimeOptions('start-time', '08:30');
   buildTimeOptions('end-time',   '17:30');
 
+  // 시간외 근무 초기 상태 off
+  _otChecked = false;
+  document.getElementById('ot-card').className     = 'chk-card off';
+  document.getElementById('chk-ot').className      = 'chk-box off';
+  document.getElementById('lbl-ot').className      = 'chk-label off';
+  document.getElementById('sub-ot').className      = 'chk-sub off';
+
   // 저녁식사 초기 상태 off
-  toggleDinnerCheck(); // 한 번 호출해서 off 상태로 초기화
   _dinnerChecked = false;
-  const dCard = document.getElementById('dinner-card');
-  dCard.className = 'chk-card off';
-  document.getElementById('chk-dinner').className = 'chk-box off';
-  document.getElementById('lbl-dinner').className = 'chk-label off';
-  document.getElementById('sub-dinner').className = 'chk-sub off';
+  document.getElementById('dinner-card').className  = 'chk-card off';
+  document.getElementById('chk-dinner').className   = 'chk-box off';
+  document.getElementById('lbl-dinner').className   = 'chk-label off';
+  document.getElementById('sub-dinner').className   = 'chk-sub off';
 
   refreshNameSelect();
   document.getElementById('btn-submit').addEventListener('click', submitForm);
@@ -583,10 +588,10 @@ function resetForm() {
   const endSel   = document.getElementById('end-time');
   if (startSel) startSel.value = '08:30';
   if (endSel)   endSel.value   = '17:30';
+  // 시간외 off 초기화
+  if (_otChecked) toggleOtCheck();
   // 저녁식사 off 초기화
   if (_dinnerChecked) toggleDinnerCheck();
-  // 시간외 on 초기화
-  if (!_otChecked) toggleOtCheck();
   document.getElementById('att-none').checked = true;
   document.getElementById('reason').value     = '';
   document.getElementById('char-count').textContent = '0 / 500';
