@@ -786,12 +786,12 @@ select.input {
   transition: all 0.2s;
 }
 .chk-box.on {
-  background: #EF4444;
-  border: 2px solid #EF4444;
+  background: #EF4444 !important;
+  border: 2px solid #EF4444 !important;
 }
 .chk-box.off {
-  border: 2px solid #FCA5A5;
-  background: var(--white);
+  border: 2px solid #FCA5A5 !important;
+  background: var(--white) !important;
 }
 .chk-box.on::after {
   content: '';
