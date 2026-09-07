@@ -690,24 +690,25 @@ select.input {
 }
 .attendance-row {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
 }
 .att-option { cursor: pointer; }
 .att-option input[type="radio"] { display: none; }
 .att-box {
   display: block;
-  padding: 10px 14px;
+  padding: 9px 2px;
   border: 1.5px solid var(--gray-200);
   border-radius: var(--radius-sm);
-  font-size: 0.88rem;
+  font-size: 0.73rem;
   font-weight: 600;
   color: var(--gray-600);
   background: var(--white);
   transition: all 0.15s;
   white-space: nowrap;
   text-align: center;
-  min-width: 64px;
+  min-width: 0;
+  flex: 1;
 }
 .att-option input:checked + .att-box {
   background: var(--blue-primary);
@@ -718,3 +719,103 @@ select.input {
   border-color: var(--blue-primary);
   color: var(--blue-primary);
 }
+
+/* ============================================================
+   select 래퍼 — 화살표 오버레이
+   ============================================================ */
+.sel-wrap {
+  position: relative;
+  width: 100%;
+}
+.sel-wrap::after {
+  content: '▾';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  font-size: 0.8rem;
+  pointer-events: none;
+}
+.sel-wrap select.input {
+  padding-right: 32px;
+  min-height: 52px;
+}
+.time-cell .sel-wrap::after {
+  right: 8px;
+  font-size: 0.75rem;
+}
+.time-cell .sel-wrap select.input {
+  min-height: 52px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* ============================================================
+   시간외근무 / 저녁식사 체크 카드 — 적색 계열
+   ============================================================ */
+.chk-card {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.15s;
+}
+.chk-card.on {
+  background: #FEF2F2;
+  border: 1.5px solid #FECACA;
+}
+.chk-card.off {
+  background: var(--gray-50);
+  border: 1.5px solid var(--gray-200);
+}
+.chk-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.chk-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.chk-box.on {
+  background: #EF4444;
+  border: 2px solid #EF4444;
+}
+.chk-box.off {
+  border: 2px solid #FCA5A5;
+  background: var(--white);
+}
+.chk-box.on::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.chk-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chk-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.chk-label.on { color: #991B1B; }
+.chk-label.off { color: var(--gray-400); }
+.chk-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.chk-sub.on { color: #EF4444; }
+.chk-sub.off { color: var(--gray-400); }
