@@ -692,12 +692,13 @@ select.input {
   display: flex;
   gap: 4px;
   flex-wrap: nowrap;
+  width: 100%;
 }
-.att-option { cursor: pointer; }
+.att-option { cursor: pointer; flex: 1; min-width: 0; }
 .att-option input[type="radio"] { display: none; }
 .att-box {
   display: block;
-  padding: 9px 2px;
+  padding: 9px 0;
   border: 1.5px solid var(--gray-200);
   border-radius: var(--radius-sm);
   font-size: 0.73rem;
@@ -707,8 +708,8 @@ select.input {
   transition: all 0.15s;
   white-space: nowrap;
   text-align: center;
+  width: 100%;
   min-width: 0;
-  flex: 1;
 }
 .att-option input:checked + .att-box {
   background: var(--blue-primary);
