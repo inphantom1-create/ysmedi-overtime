@@ -245,15 +245,32 @@ function gasPostRequest(params, retryCount = 0) {
 /* ============================================================
    신청인 목록 관리
    ============================================================ */
-function getMembers() {
-  try { const s = localStorage.getItem('overtime_members'); if (s) return JSON.parse(s); } catch(e) {}
-  return [...DEFAULT_MEMBERS];
-}
-function saveMembers(list) {
-  try { localStorage.setItem('overtime_members', JSON.stringify(list)); } catch(e) {}
-}
+/* ============================================================
+   신청인 목록 — GAS 스프레드시트 연동
+   ============================================================ */
+
+/* ============================================================
+   신청인 목록 — GAS 스프레드시트 연동 (Promise 방식)
+   ============================================================ */
+
+// GAS에서 신청인 목록 로드 → select 갱신
 function refreshNameSelect() {
-  const members = getMembers();
+  gasRequest({ action: 'getMembers' })
+    .then(res => {
+      const members = (res && res.success && res.members)
+        ? res.members.map(m => m.name)
+        : [...DEFAULT_MEMBERS];
+      try { localStorage.setItem('overtime_members', JSON.stringify(members)); } catch(e) {}
+      applyMembersToSelect(members);
+    })
+    .catch(() => {
+      let members = [...DEFAULT_MEMBERS];
+      try { const s = localStorage.getItem('overtime_members'); if (s) members = JSON.parse(s); } catch(e) {}
+      applyMembersToSelect(members);
+    });
+}
+
+function applyMembersToSelect(members) {
   ['name','filter-name'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -269,39 +286,64 @@ function refreshNameSelect() {
     sel.value = cur;
   });
 }
+
 function renderMemberList() {
-  const members = getMembers();
   const wrap = document.getElementById('member-list');
   if (!wrap) return;
-  if (!members.length) {
-    wrap.innerHTML = '<div class="no-data" style="border:none;padding:20px 0;">등록된 신청인이 없습니다.</div>';
-    return;
-  }
-  wrap.innerHTML = members.map((m,i) => `
-    <div class="member-item">
-      <span class="member-name">${i+1}. ${m}</span>
-      <button class="btn-delete-member" onclick="deleteMember(${i})">삭제</button>
-    </div>`).join('');
+  wrap.innerHTML = '<div style="padding:12px 0;color:#9AA3B2;font-size:0.85rem;">불러오는 중...</div>';
+  gasRequest({ action: 'getMembers' })
+    .then(res => {
+      const members = (res && res.success && res.members) ? res.members : [];
+      if (!members.length) {
+        wrap.innerHTML = '<div class="no-data" style="border:none;padding:20px 0;">등록된 신청인이 없습니다.</div>';
+        return;
+      }
+      wrap.innerHTML = members.map((m, i) => `
+        <div class="member-item">
+          <span class="member-name">${i+1}. ${m.name}</span>
+          <button class="btn-delete-member" onclick="deleteMember('${m.name.replace(/'/g,"\'")}')">삭제</button>
+        </div>`).join('');
+    })
+    .catch(() => {
+      wrap.innerHTML = '<div class="no-data" style="border:none;padding:20px 0;color:#E53E3E;">목록 불러오기 실패</div>';
+    });
 }
+
 function addMember() {
   const input = document.getElementById('new-member');
   const errEl = document.getElementById('err-member');
   const name  = input.value.trim();
   if (!name) { errEl.textContent = '이름을 입력해 주세요.'; return; }
-  const members = getMembers();
-  if (members.includes(name)) { errEl.textContent = '이미 등록된 이름입니다.'; return; }
-  members.push(name); saveMembers(members);
-  input.value = ''; errEl.textContent = '';
-  renderMemberList(); refreshNameSelect();
-  showToast(`✅ "${name}" 추가되었습니다.`, 'success');
+  errEl.textContent = '';
+
+  gasRequest({ action: 'addMember', name: name, password: ADMIN_PASSWORD })
+    .then(res => {
+      if (res && res.success) {
+        input.value = '';
+        renderMemberList();
+        refreshNameSelect();
+        showToast(`✅ "${name}" 추가되었습니다.`, 'success');
+      } else {
+        errEl.textContent = (res && res.error) ? res.error : '추가 실패';
+      }
+    })
+    .catch(() => { errEl.textContent = '서버 연결 실패. 다시 시도해 주세요.'; });
 }
-function deleteMember(index) {
-  const members = getMembers();
-  const name = members[index];
+
+function deleteMember(name) {
   if (!confirm(`"${name}"을(를) 삭제할까요?`)) return;
-  members.splice(index, 1); saveMembers(members);
-  renderMemberList(); refreshNameSelect();
-  showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
+
+  gasRequest({ action: 'deleteMember', name: name, password: ADMIN_PASSWORD })
+    .then(res => {
+      if (res && res.success) {
+        renderMemberList();
+        refreshNameSelect();
+        showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
+      } else {
+        showToast((res && res.error) ? res.error : '삭제 실패', 'error');
+      }
+    })
+    .catch(() => { showToast('서버 연결 실패. 다시 시도해 주세요.', 'error'); });
 }
 
 /* ============================================================
