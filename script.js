@@ -108,6 +108,56 @@ function isWeekendOrHolidayJS(dateStr) {
   return holidays.includes(dateStr);
 }
 
+
+/* ============================================================
+   30분 단위 시간 select 옵션 생성
+   ============================================================ */
+function buildTimeOptions(selId, defaultVal) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (let h = 0; h < 24; h++) {
+    for (let m of [0, 30]) {
+      const val = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = val;
+      if (val === defaultVal) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+}
+
+/* 시간외근무 토글 */
+let _otChecked = true;
+function toggleOtCheck() {
+  _otChecked = !_otChecked;
+  const card = document.getElementById('ot-card');
+  const box  = document.getElementById('chk-ot');
+  const lbl  = document.getElementById('lbl-ot');
+  const sub  = document.getElementById('sub-ot');
+  card.className = _otChecked ? 'chk-card on' : 'chk-card off';
+  box.className  = _otChecked ? 'chk-box on'  : 'chk-box off';
+  lbl.className  = _otChecked ? 'chk-label on': 'chk-label off';
+  sub.className  = _otChecked ? 'chk-sub on'  : 'chk-sub off';
+  calcOvertime();
+}
+
+/* 저녁식사 토글 */
+let _dinnerChecked = false;
+function toggleDinnerCheck() {
+  _dinnerChecked = !_dinnerChecked;
+  const card = document.getElementById('dinner-card');
+  const box  = document.getElementById('chk-dinner');
+  const lbl  = document.getElementById('lbl-dinner');
+  const sub  = document.getElementById('sub-dinner');
+  card.className = _dinnerChecked ? 'chk-card on' : 'chk-card off';
+  box.className  = _dinnerChecked ? 'chk-box on'  : 'chk-box off';
+  lbl.className  = _dinnerChecked ? 'chk-label on': 'chk-label off';
+  sub.className  = _dinnerChecked ? 'chk-sub on'  : 'chk-sub off';
+  calcOvertime();
+}
+
 /* ============================================================
    GAS 통신 — JSONP
    ============================================================ */
@@ -195,28 +245,15 @@ function gasPostRequest(params, retryCount = 0) {
 /* ============================================================
    신청인 목록 관리
    ============================================================ */
-/* ============================================================
-   신청인 목록 관리 — 구글 스프레드시트 연동
-   ============================================================ */
-let _memberCache = null;
-
-async function fetchMembers() {
-  if (_memberCache) return _memberCache;
-  try {
-    const result = await gasRequest({ action: 'getMembers' });
-    if (result && result.success && result.members) {
-      _memberCache = result.members;
-    } else {
-      _memberCache = DEFAULT_MEMBERS.map(m => ({ name: m, job: '' }));
-    }
-  } catch(e) {
-    _memberCache = DEFAULT_MEMBERS.map(m => ({ name: m, job: '' }));
-  }
-  return _memberCache;
+function getMembers() {
+  try { const s = localStorage.getItem('overtime_members'); if (s) return JSON.parse(s); } catch(e) {}
+  return [...DEFAULT_MEMBERS];
 }
-
-async function refreshNameSelect() {
-  const members = await fetchMembers();
+function saveMembers(list) {
+  try { localStorage.setItem('overtime_members', JSON.stringify(list)); } catch(e) {}
+}
+function refreshNameSelect() {
+  const members = getMembers();
   ['name','filter-name'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -226,78 +263,45 @@ async function refreshNameSelect() {
       : '<option value="">-- 이름 선택 --</option>';
     members.forEach(m => {
       const opt = document.createElement('option');
-      const name = typeof m === 'string' ? m : m.name;
-      opt.value = name; opt.textContent = name;
+      opt.value = m; opt.textContent = m;
       sel.appendChild(opt);
     });
     sel.value = cur;
   });
 }
-
-async function renderMemberList() {
+function renderMemberList() {
+  const members = getMembers();
   const wrap = document.getElementById('member-list');
   if (!wrap) return;
-  wrap.innerHTML = '<div style="padding:12px;text-align:center;color:#999">조회 중...</div>';
-  const members = await fetchMembers();
   if (!members.length) {
     wrap.innerHTML = '<div class="no-data" style="border:none;padding:20px 0;">등록된 신청인이 없습니다.</div>';
     return;
   }
-  wrap.innerHTML = members.map((m, i) => {
-    const name = typeof m === 'string' ? m : m.name;
-    const job  = typeof m === 'object' ? (m.job || '') : '';
-    return `<div class="member-item">
-      <span class="member-name">${i+1}. ${name} <span style="color:#999;font-size:12px;">${job}</span></span>
-      <button class="btn-delete-member" onclick="deleteMember('${name}')">삭제</button>
-    </div>`;
-  }).join('');
+  wrap.innerHTML = members.map((m,i) => `
+    <div class="member-item">
+      <span class="member-name">${i+1}. ${m}</span>
+      <button class="btn-delete-member" onclick="deleteMember(${i})">삭제</button>
+    </div>`).join('');
 }
-
-async function addMember() {
+function addMember() {
   const input = document.getElementById('new-member');
   const errEl = document.getElementById('err-member');
   const name  = input.value.trim();
   if (!name) { errEl.textContent = '이름을 입력해 주세요.'; return; }
-  try {
-    const result = await gasRequest({
-      action:   'addMember',
-      password: ADMIN_PASSWORD,
-      name:     name,
-      job:      '',
-    });
-    if (result && result.success) {
-      _memberCache = null;
-      input.value = ''; errEl.textContent = '';
-      await renderMemberList();
-      await refreshNameSelect();
-      showToast(`✅ "${name}" 추가되었습니다.`, 'success');
-    } else {
-      errEl.textContent = (result && result.error) || '추가 실패';
-    }
-  } catch(e) {
-    errEl.textContent = '오류: ' + e.message;
-  }
+  const members = getMembers();
+  if (members.includes(name)) { errEl.textContent = '이미 등록된 이름입니다.'; return; }
+  members.push(name); saveMembers(members);
+  input.value = ''; errEl.textContent = '';
+  renderMemberList(); refreshNameSelect();
+  showToast(`✅ "${name}" 추가되었습니다.`, 'success');
 }
-
-async function deleteMember(name) {
+function deleteMember(index) {
+  const members = getMembers();
+  const name = members[index];
   if (!confirm(`"${name}"을(를) 삭제할까요?`)) return;
-  try {
-    const result = await gasRequest({
-      action:   'deleteMember',
-      password: ADMIN_PASSWORD,
-      name:     name,
-    });
-    if (result && result.success) {
-      _memberCache = null;
-      await renderMemberList();
-      await refreshNameSelect();
-      showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
-    } else {
-      showToast('삭제 실패: ' + ((result && result.error) || '오류'), 'error');
-    }
-  } catch(e) {
-    showToast('오류: ' + e.message, 'error');
-  }
+  members.splice(index, 1); saveMembers(members);
+  renderMemberList(); refreshNameSelect();
+  showToast(`🗑️ "${name}" 삭제되었습니다.`, '');
 }
 
 /* ============================================================
@@ -306,14 +310,26 @@ async function deleteMember(name) {
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('today-date').textContent = getTodayLabel();
   document.getElementById('work-date').value = getTodayKST();
-  refreshNameSelect(); // 비동기 — GAS에서 신청인 목록 조회
-  document.getElementById('work-date').addEventListener('change', calcOvertime);
+
+  // 30분 단위 시간 옵션 생성
+  buildTimeOptions('start-time', '08:30');
+  buildTimeOptions('end-time',   '17:30');
+
+  // 저녁식사 초기 상태 off
+  toggleDinnerCheck(); // 한 번 호출해서 off 상태로 초기화
+  _dinnerChecked = false;
+  const dCard = document.getElementById('dinner-card');
+  dCard.className = 'chk-card off';
+  document.getElementById('chk-dinner').className = 'chk-box off';
+  document.getElementById('lbl-dinner').className = 'chk-label off';
+  document.getElementById('sub-dinner').className = 'chk-sub off';
+
+  refreshNameSelect();
   document.getElementById('btn-submit').addEventListener('click', submitForm);
-  ['start-time','end-time','dinner'].forEach(id =>
+  ['start-time','end-time'].forEach(id =>
     document.getElementById(id).addEventListener('change', calcOvertime));
   document.querySelectorAll('input[name="attendance"]').forEach(r =>
     r.addEventListener('change', calcOvertime));
-  // 날짜 변경 시 재계산 (토/일/공휴일 여부 반영)
   document.getElementById('work-date').addEventListener('change', calcOvertime);
   document.getElementById('reason').addEventListener('input', () => {
     document.getElementById('char-count').textContent =
@@ -330,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function calcOvertime() {
   const startVal   = document.getElementById('start-time').value;
   const endVal     = document.getElementById('end-time').value;
-  const hasDinner  = document.getElementById('dinner').checked;
+  const hasDinner  = _dinnerChecked;
   const attendance = getAttendance();
   const workDate   = document.getElementById('work-date').value;
 
@@ -344,11 +360,11 @@ function calcOvertime() {
     attRow.style.display = 'none';
   }
 
-  // 연차 선택 시 근무시간 0으로 처리
-  // 연차/교육/예비군: 근무시간 0 처리
+  // 연차/교육/예비군 선택 시 근무시간 0 처리
   if (attendance === '연차' || attendance === '교육' || attendance === '예비군') {
     document.getElementById('actual-display').textContent   = '0시간 0분';
     document.getElementById('overtime-display').textContent = '0시간 0분';
+    document.getElementById('ot-notice-row').style.display  = 'none';
     window._actualLabel   = '0시간 0분';
     window._overtimeLabel = '0시간 0분';
     document.getElementById('reason').placeholder = attendance;
@@ -380,22 +396,27 @@ function calcOvertime() {
   const actualWork   = Math.max(0, totalWork - lunchDeduct - dinnerDeduct);
   const basePure     = baseWork - lunchDeduct;
 
+  document.getElementById('actual-display').textContent = minToLabel(actualWork);
+  window._actualLabel = minToLabel(actualWork);
+
+  // 시간외 미체크 시 시외 0
+  if (!_otChecked) {
+    document.getElementById('overtime-display').textContent = '0시간 0분';
+    document.getElementById('ot-notice-row').style.display  = 'block';
+    window._overtimeLabel = '0시간 0분';
+    return;
+  }
+  document.getElementById('ot-notice-row').style.display = 'none';
+
   // 토/일/공휴일이면 시외 = 총근무시간 전체
   const isWkndHol = isWeekendOrHolidayJS(workDate);
   const overtime  = isWkndHol ? actualWork : Math.max(0, actualWork - basePure);
 
-  document.getElementById('actual-display').textContent   = minToLabel(actualWork);
   document.getElementById('overtime-display').textContent = minToLabel(overtime);
   window._overtimeLabel = minToLabel(overtime);
-  window._actualLabel   = minToLabel(actualWork);
 
-  // placeholder 설정
   const reasonEl = document.getElementById('reason');
-  if (overtime > 0) {
-    reasonEl.placeholder = '시외 근무 사유를 입력해 주세요.';
-  } else {
-    reasonEl.placeholder = '정규 근무 / 시외 근무 사유를 입력해 주세요.';
-  }
+  reasonEl.placeholder = overtime > 0 ? '시외 근무 사유를 입력해 주세요.' : '정규 근무 사유를 입력해 주세요.';
 }
 
 /* ============================================================
@@ -466,7 +487,7 @@ async function submitForm() {
     startTime:  document.getElementById('start-time').value,
     endTime:    document.getElementById('end-time').value,
     attendance: getAttendance(),
-    dinner:     document.getElementById('dinner').checked ? 'Y' : 'N',
+    dinner:     _dinnerChecked ? 'Y' : 'N',
     actualWork: window._actualLabel   || '0시간 0분',
     overtime:   window._overtimeLabel || '0시간 0분',
     reason:     document.getElementById('reason').value.trim(),
@@ -557,9 +578,15 @@ function resetForm() {
   document.getElementById('name').value       = '';
   document.getElementById('job').value        = '';
   document.getElementById('work-date').value  = getTodayKST();
-  document.getElementById('start-time').value = '08:30';
-  document.getElementById('end-time').value   = '17:30';
-  document.getElementById('dinner').checked   = false;
+  // 시간 select 초기화
+  const startSel = document.getElementById('start-time');
+  const endSel   = document.getElementById('end-time');
+  if (startSel) startSel.value = '08:30';
+  if (endSel)   endSel.value   = '17:30';
+  // 저녁식사 off 초기화
+  if (_dinnerChecked) toggleDinnerCheck();
+  // 시간외 on 초기화
+  if (!_otChecked) toggleOtCheck();
   document.getElementById('att-none').checked = true;
   document.getElementById('reason').value     = '';
   document.getElementById('char-count').textContent = '0 / 500';
