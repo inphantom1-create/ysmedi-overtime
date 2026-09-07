@@ -36,28 +36,32 @@
       <div class="card">
         <h2 class="card-title">신청인 정보</h2>
 
-        <!-- ① 이름 -->
+        <!-- 이름 -->
         <div class="field">
           <label class="label" for="name">이름 <span class="required">*</span></label>
-          <select class="input" id="name">
-            <option value="">-- 이름 선택 --</option>
-          </select>
+          <div class="sel-wrap">
+            <select class="input" id="name">
+              <option value="">-- 이름 선택 --</option>
+            </select>
+          </div>
           <span class="field-error" id="err-name"></span>
         </div>
 
-        <!-- ② 직무 -->
+        <!-- 직무 -->
         <div class="field">
           <label class="label" for="job">직무 <span class="required">*</span></label>
-          <select class="input" id="job">
-            <option value="">-- 직무 선택 --</option>
-            <option value="칭량">칭량</option>
-            <option value="조제">조제</option>
-            <option value="충전">충전</option>
-            <option value="오버랩">오버랩</option>
-            <option value="검사">검사</option>
-            <option value="멸균">멸균</option>
-            <option value="포장">포장</option>
-          </select>
+          <div class="sel-wrap">
+            <select class="input" id="job">
+              <option value="">-- 직무 선택 --</option>
+              <option value="칭량">칭량</option>
+              <option value="조제">조제</option>
+              <option value="충전">충전</option>
+              <option value="오버랩">오버랩</option>
+              <option value="검사">검사</option>
+              <option value="멸균">멸균</option>
+              <option value="포장">포장</option>
+            </select>
+          </div>
           <span class="field-error" id="err-job"></span>
         </div>
       </div>
@@ -66,37 +70,41 @@
       <div class="card">
         <h2 class="card-title">근무 시간</h2>
 
-        <!-- ③ 근무 날짜 -->
+        <!-- 근무 날짜 -->
         <div class="field">
           <label class="label" for="work-date">근무 날짜 <span class="required">*</span></label>
           <input class="input" type="date" id="work-date" />
           <span class="field-error" id="err-date"></span>
         </div>
 
-        <!-- ④ 출근 / 퇴근 한 행 -->
+        <!-- 출퇴근 시간 — 30분 단위 select -->
         <div class="field">
           <label class="label">출퇴근 시간 <span class="required">*</span></label>
           <div class="time-row">
             <div class="time-cell">
               <span class="time-label">출근</span>
-              <input class="input input-time" type="time" id="start-time" value="08:30" />
+              <div class="sel-wrap">
+                <select class="input input-time" id="start-time"></select>
+              </div>
             </div>
             <span class="time-sep">~</span>
             <div class="time-cell">
               <span class="time-label">퇴근</span>
-              <input class="input input-time" type="time" id="end-time" value="17:30" />
+              <div class="sel-wrap">
+                <select class="input input-time" id="end-time"></select>
+              </div>
             </div>
           </div>
           <span class="field-error" id="err-time"></span>
         </div>
 
-        <!-- ⑤ 근태 선택 -->
+        <!-- 근태 선택 — 한 줄 6개 -->
         <div class="field">
           <label class="label">근태 <span class="label-optional">(해당 시 선택)</span></label>
           <div class="attendance-row">
             <label class="att-option" for="att-none">
               <input type="radio" name="attendance" id="att-none" value="" checked />
-              <span class="att-box">해당없음</span>
+              <span class="att-box">정규근무</span>
             </label>
             <label class="att-option" for="att-annual">
               <input type="radio" name="attendance" id="att-annual" value="연차" />
@@ -121,12 +129,27 @@
           </div>
         </div>
 
-        <!-- 저녁식사 -->
-        <label class="checkbox-row" for="dinner">
-          <input type="checkbox" id="dinner" />
-          <span class="checkbox-custom"></span>
-          <span class="checkbox-label">저녁식사 실시 <span class="checkbox-sub">(18:00~18:30 차감)</span></span>
-        </label>
+        <!-- 시간외 근무 체크 -->
+        <div class="chk-card on" id="ot-card" onclick="toggleOtCheck()">
+          <div class="chk-inner">
+            <div class="chk-box on" id="chk-ot"></div>
+            <div class="chk-text">
+              <span class="chk-label on" id="lbl-ot">시간외 근무</span>
+              <span class="chk-sub on" id="sub-ot">체크 시 시간외 계산 적용</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 저녁식사 체크 -->
+        <div class="chk-card on" id="dinner-card" onclick="toggleDinnerCheck()">
+          <div class="chk-inner">
+            <div class="chk-box on" id="chk-dinner"></div>
+            <div class="chk-text">
+              <span class="chk-label on" id="lbl-dinner">저녁식사 실시</span>
+              <span class="chk-sub on" id="sub-dinner">18:00~18:30 차감</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 자동 계산 결과 -->
@@ -150,11 +173,14 @@
         <div class="result-divider"></div>
         <div class="result-row">
           <span class="result-label">실근무시간</span>
-          <span class="result-value" id="actual-display">8시간</span>
+          <span class="result-value" id="actual-display">-</span>
         </div>
         <div class="result-row result-total">
           <span class="result-label">시간외 근무</span>
           <span class="result-value highlight" id="overtime-display">0시간 0분</span>
+        </div>
+        <div class="result-row" id="ot-notice-row" style="display:none;">
+          <span class="result-value" style="color:#9AA3B2;font-size:0.78rem;">※ 시간외 근무 미체크 — 시외 계산 제외</span>
         </div>
       </div>
 
@@ -164,7 +190,7 @@
         <div class="field">
           <label class="label" for="reason">사유 <span class="required">*</span></label>
           <textarea class="input textarea" id="reason"
-            placeholder="시간외 근무 사유를 입력해 주세요." rows="4" maxlength="500"></textarea>
+            placeholder="근무 사유를 입력해 주세요." rows="4" maxlength="500"></textarea>
           <span class="char-count" id="char-count">0 / 500</span>
           <span class="field-error" id="err-reason"></span>
         </div>
@@ -199,14 +225,12 @@
   <!-- ===== 페이지: 관리자 대시보드 ===== -->
   <main id="page-admin" class="page">
     <div class="container">
-
-      <!-- 탭 메뉴 -->
       <div class="tab-row">
         <button class="tab-btn active" id="tab-data"   onclick="switchTab('data')">📋 신청 내역</button>
         <button class="tab-btn"        id="tab-member" onclick="switchTab('member')">👤 신청인 관리</button>
       </div>
 
-      <!-- ── 탭: 신청 내역 ── -->
+      <!-- 신청 내역 탭 -->
       <div id="panel-data">
         <div class="card">
           <h2 class="card-title">조회 / 검색</h2>
@@ -223,76 +247,57 @@
           <div class="field-row">
             <div class="field flex1">
               <label class="label" for="filter-name">이름</label>
-              <select class="input" id="filter-name">
-                <option value="">전체</option>
-              </select>
+              <div class="sel-wrap">
+                <select class="input" id="filter-name">
+                  <option value="">전체</option>
+                </select>
+              </div>
             </div>
             <div class="field flex1">
               <label class="label" for="filter-job">직무</label>
-              <select class="input" id="filter-job">
-                <option value="">전체</option>
-                <option value="칭량">칭량</option>
-                <option value="조제">조제</option>
-                <option value="충전">충전</option>
-                <option value="오버랩">오버랩</option>
-                <option value="검사">검사</option>
-                <option value="멸균">멸균</option>
-                <option value="포장">포장</option>
-              </select>
+              <div class="sel-wrap">
+                <select class="input" id="filter-job">
+                  <option value="">전체</option>
+                  <option value="칭량">칭량</option>
+                  <option value="조제">조제</option>
+                  <option value="충전">충전</option>
+                  <option value="오버랩">오버랩</option>
+                  <option value="검사">검사</option>
+                  <option value="멸균">멸균</option>
+                  <option value="포장">포장</option>
+                </select>
+              </div>
             </div>
           </div>
           <button class="btn-search" onclick="fetchAdminData()">🔍 조회</button>
         </div>
 
-        <!-- 합계 카드 -->
         <div class="card card-summary" id="summary-card" style="display:none;">
-          <div class="summary-row">
-            <span>총 신청 건수</span>
-            <span id="sum-count" class="summary-val">0건</span>
-          </div>
-          <div class="summary-row">
-            <span>총 실근무시간</span>
-            <span id="sum-actual" class="summary-val">0시간</span>
-          </div>
-          <div class="summary-row">
-            <span>총 시간외 근무</span>
-            <span id="sum-hours" class="summary-val highlight">0시간 0분</span>
-          </div>
+          <div class="summary-row"><span>총 신청 건수</span><span id="sum-count" class="summary-val">0건</span></div>
+          <div class="summary-row"><span>총 실근무시간</span><span id="sum-actual" class="summary-val">0시간</span></div>
+          <div class="summary-row"><span>총 시간외 근무</span><span id="sum-hours" class="summary-val highlight">0시간 0분</span></div>
         </div>
 
-        <button class="btn-csv" id="btn-csv" style="display:none;" onclick="downloadCSV()">
-          ⬇ Excel(CSV) 다운로드
-        </button>
+        <button class="btn-csv" id="btn-csv" style="display:none;" onclick="downloadCSV()">⬇ Excel(CSV) 다운로드</button>
 
-        <!-- 데이터 테이블 -->
         <div id="admin-table-wrap" style="display:none;">
           <div class="table-scroll">
             <table class="data-table" id="admin-table">
               <thead>
                 <tr>
-                  <th>삭제</th>
-                  <th>신청일시</th>
-                  <th>이름</th>
-                  <th>직무</th>
-                  <th>근무날짜</th>
-                  <th>출근</th>
-                  <th>퇴근</th>
-                  <th>근태</th>
-                  <th>저녁</th>
-                  <th>실근무</th>
-                  <th>시간외</th>
-                  <th>사유</th>
+                  <th>삭제</th><th>신청일시</th><th>이름</th><th>직무</th>
+                  <th>근무날짜</th><th>출근</th><th>퇴근</th><th>근태</th>
+                  <th>저녁</th><th>실근무</th><th>시간외</th><th>사유</th>
                 </tr>
               </thead>
               <tbody id="admin-tbody"></tbody>
             </table>
           </div>
         </div>
-
         <div id="no-data" class="no-data" style="display:none;">조회된 데이터가 없습니다.</div>
       </div>
 
-      <!-- ── 탭: 신청인 관리 ── -->
+      <!-- 신청인 관리 탭 -->
       <div id="panel-member" style="display:none;">
         <div class="card">
           <h2 class="card-title">신청인 추가</h2>
@@ -314,7 +319,6 @@
     </div>
   </main>
 
-  <!-- 토스트 -->
   <div id="toast" class="toast" style="display:none;"></div>
 
   <!-- 삭제 확인 모달 -->
