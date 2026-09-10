@@ -162,11 +162,15 @@ function toggleDinnerCheck() {
    GAS 통신 — JSONP
    ============================================================ */
 function gasRequest(params, retryCount = 0) {
+  // ① submit/submitWithCheck/deleteRow 는 재시도 금지 (중복 저장 방지)
+  const NO_RETRY_ACTIONS = ['submit', 'submitWithCheck', 'deleteRow'];
+  const noRetry = NO_RETRY_ACTIONS.includes(params.action);
+
   return new Promise((resolve, reject) => {
     const cbName = 'gas_cb_' + Date.now() + '_' + Math.floor(Math.random()*99999);
     const timer = setTimeout(() => {
       cleanup();
-      if (retryCount < 1) {
+      if (!noRetry && retryCount < 1) {
         gasRequest(params, retryCount + 1).then(resolve).catch(reject);
       } else {
         reject(new Error('요청 시간 초과'));
@@ -187,7 +191,7 @@ function gasRequest(params, retryCount = 0) {
     script.src = `${GAS_URL}?${qs}`;
     script.onerror = () => {
       cleanup();
-      if (retryCount < 1) {
+      if (!noRetry && retryCount < 1) {
         gasRequest(params, retryCount + 1).then(resolve).catch(reject);
       } else {
         reject(new Error('네트워크 오류'));
@@ -522,8 +526,10 @@ let _pendingPayload = null;
 let _dupRowIndex    = null;
 
 async function submitForm() {
+  // ② 중복 클릭 완전 차단
+  if (_isSubmitting) return;
+  _isSubmitting = true;
   const btn = document.getElementById('btn-submit');
-  if (btn.disabled) return;
   btn.disabled = true;
   if (!validateForm()) { btn.disabled = false; return; }
   const payload = {
