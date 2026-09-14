@@ -531,7 +531,11 @@ async function submitForm() {
   _isSubmitting = true;
   const btn = document.getElementById('btn-submit');
   btn.disabled = true;
-  if (!validateForm()) { btn.disabled = false; return; }
+  if (!validateForm()) {
+    btn.disabled = false;
+    _isSubmitting = false;  // 유효성 실패 시 플래그 해제
+    return;
+  }
   const payload = {
     action:     'submitWithCheck',
     name:       document.getElementById('name').value,
@@ -591,8 +595,16 @@ async function confirmOverwrite() {
   document.getElementById('dup-modal-overlay').style.display = 'none';
   if (!_pendingPayload || !_dupRowIndex) return;
   const payload  = _pendingPayload;
-  const rowIndex = _dupRowIndex;
+  const rowIndex = parseInt(_dupRowIndex);
   _pendingPayload = null; _dupRowIndex = null;
+
+  // rowIndex 유효성 검사
+  if (!rowIndex || rowIndex < 2) {
+    showToast('❌ 삭제할 행 정보가 올바르지 않습니다. 다시 신청해 주세요.', 'error');
+    _isSubmitting = false;
+    return;
+  }
+
   setLoading(true, '기존 데이터 삭제 중...'); _isSubmitting = true;
   try {
     const delResult = await gasRequest({
@@ -601,9 +613,14 @@ async function confirmOverwrite() {
       rowIndex: rowIndex,
     });
     if (!delResult || !delResult.success) {
-      showToast('❌ 삭제 실패: ' + ((delResult && delResult.error) || '오류'), 'error');
-      setLoading(false); _isSubmitting = false;
-      return;
+      // 행이 이미 없는 경우 → 바로 새로 저장
+      if (delResult && delResult.error && delResult.error.includes('찾을 수 없')) {
+        setLoading(true, '새로 저장 중...');
+      } else {
+        showToast('❌ 삭제 실패: ' + ((delResult && delResult.error) || '오류'), 'error');
+        setLoading(false); _isSubmitting = false;
+        return;
+      }
     }
     setLoading(true, '새로 저장 중...');
     await new Promise(r => setTimeout(r, 500));
