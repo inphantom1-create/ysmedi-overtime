@@ -7,8 +7,8 @@ const WORK_START  = timeToMin('08:30');
 const WORK_END    = timeToMin('17:30');
 const LUNCH_START = timeToMin('12:00');
 const LUNCH_END   = timeToMin('13:00');
-const DIN_START   = timeToMin('18:00');
-const DIN_END     = timeToMin('18:30');
+const DIN_START   = timeToMin('17:30');
+const DIN_END     = timeToMin('18:00');
 const DEFAULT_MEMBERS = [
   '하정열','강경민','오근탁','김지필','김민수','김동영','조재선','조웅제',
   '조성훈','오석순','김희원','양지유','배경순','김향란','진종민','박채영',
@@ -594,17 +594,44 @@ function closeDupModal() {
 async function confirmOverwrite() {
   document.getElementById('dup-modal-overlay').style.display = 'none';
   if (!_pendingPayload || !_dupRowIndex) return;
-  const payload  = _pendingPayload;
+  const payload  = { ..._pendingPayload };
   const rowIndex = parseInt(_dupRowIndex);
   _pendingPayload = null; _dupRowIndex = null;
 
   // rowIndex 유효성 검사
   if (!rowIndex || rowIndex < 2) {
-    showToast('❌ 삭제할 행 정보가 올바르지 않습니다. 다시 신청해 주세요.', 'error');
+    showToast('❌ 행 정보가 올바르지 않습니다. 다시 신청해 주세요.', 'error');
     _isSubmitting = false;
     return;
   }
 
+  // 저장 먼저 → 성공 후 삭제 (GAS overwrite 단일 호출)
+  setLoading(true, '변경 저장 중...'); _isSubmitting = true;
+  try {
+    const result = await gasRequest({
+      ...payload,
+      action:   'overwrite',
+      rowIndex: rowIndex,
+    });
+    if (result && result.success) {
+      if (result.warning) {
+        showToast('✅ 저장 완료 (이전 데이터 확인 필요)', 'success');
+      } else {
+        showToast('✅ 변경 완료!', 'success');
+      }
+      resetForm();
+    } else {
+      showToast('❌ ' + ((result && result.error) || '변경 실패'), 'error');
+    }
+    setLoading(false); _isSubmitting = false;
+    return;  // 아래 기존 코드 실행 안 함
+  } catch(e) {
+    showToast('❌ 네트워크 오류 — 데이터는 보존됩니다. 다시 시도해 주세요.', 'error');
+    setLoading(false); _isSubmitting = false;
+    return;
+  }
+
+  // ↓ 아래는 레거시 — 실행되지 않음 (하위 호환용)
   setLoading(true, '기존 데이터 삭제 중...'); _isSubmitting = true;
   try {
     const delResult = await gasRequest({
@@ -613,7 +640,6 @@ async function confirmOverwrite() {
       rowIndex: rowIndex,
     });
     if (!delResult || !delResult.success) {
-      // 행이 이미 없는 경우 → 바로 새로 저장
       if (delResult && delResult.error && delResult.error.includes('찾을 수 없')) {
         setLoading(true, '새로 저장 중...');
       } else {
