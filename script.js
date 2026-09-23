@@ -163,7 +163,7 @@ function toggleDinnerCheck() {
    ============================================================ */
 function gasRequest(params, retryCount = 0) {
   // ① submit/submitWithCheck/deleteRow 는 재시도 금지 (중복 저장 방지)
-  const NO_RETRY_ACTIONS = ['submit', 'submitWithCheck', 'deleteRow'];
+  const NO_RETRY_ACTIONS = ['submit', 'submitWithCheck', 'deleteRow', 'overwrite'];
   const noRetry = NO_RETRY_ACTIONS.includes(params.action);
 
   return new Promise((resolve, reject) => {
