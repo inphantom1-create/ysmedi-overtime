@@ -351,6 +351,73 @@ function deleteMember(name) {
 }
 
 /* ============================================================
+   대체근무일 관리
+   ============================================================ */
+function renderSubWorkList() {
+  const list = document.getElementById('subwork-list');
+  list.innerHTML = '<p style="color:#9AA3B2;font-size:0.85rem;padding:8px 0;">불러오는 중...</p>';
+
+  gasRequest({ action: 'getSubWorkDays', password: ADMIN_PASSWORD })
+    .then(res => {
+      if (!res || !res.success) {
+        list.innerHTML = '<p style="color:#EF4444;">불러오기 실패</p>';
+        return;
+      }
+      const days = res.days || [];
+      if (days.length === 0) {
+        list.innerHTML = '<p style="color:#9AA3B2;font-size:0.85rem;padding:8px 0;">등록된 대체근무일이 없습니다.</p>';
+        return;
+      }
+      list.innerHTML = days.map(d => `
+        <div class="member-row">
+          <div class="member-info">
+            <span class="member-name">${d.date}</span>
+            <span class="member-job">${d.memo || ''}</span>
+          </div>
+          <button class="btn-delete-member" onclick="deleteSubWorkDay(${d.rowIndex}, '${d.date}')">삭제</button>
+        </div>`).join('');
+    })
+    .catch(() => { list.innerHTML = '<p style="color:#EF4444;">서버 연결 실패</p>'; });
+}
+
+function addSubWorkDay() {
+  const date = document.getElementById('sub-date').value;
+  const memo = document.getElementById('sub-memo').value.trim();
+  const errEl = document.getElementById('err-subwork');
+
+  if (!date) { errEl.textContent = '날짜를 선택해주세요.'; return; }
+  errEl.textContent = '';
+
+  gasRequest({ action: 'addSubWorkDay', date: date, memo: encodeURIComponent(memo), password: ADMIN_PASSWORD })
+    .then(res => {
+      if (res && res.success) {
+        document.getElementById('sub-date').value = '';
+        document.getElementById('sub-memo').value = '';
+        renderSubWorkList();
+        showToast(`✅ ${date} 대체근무일이 등록되었습니다.`, '');
+      } else {
+        errEl.textContent = (res && res.error) ? res.error : '추가 실패';
+      }
+    })
+    .catch(() => { errEl.textContent = '서버 연결 실패. 다시 시도해 주세요.'; });
+}
+
+function deleteSubWorkDay(rowIndex, date) {
+  if (!confirm(`"${date}" 대체근무일을 삭제할까요?`)) return;
+
+  gasRequest({ action: 'deleteSubWorkDay', rowIndex: rowIndex, password: ADMIN_PASSWORD })
+    .then(res => {
+      if (res && res.success) {
+        renderSubWorkList();
+        showToast(`🗑️ "${date}" 대체근무일이 삭제되었습니다.`, '');
+      } else {
+        showToast((res && res.error) ? res.error : '삭제 실패', 'error');
+      }
+    })
+    .catch(() => { showToast('서버 연결 실패. 다시 시도해 주세요.', 'error'); });
+}
+
+/* ============================================================
    초기화
    ============================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -479,11 +546,14 @@ function showPage(pageName) {
   window.scrollTo(0, 0);
 }
 function switchTab(tab) {
-  document.getElementById('tab-data').classList.toggle('active',   tab === 'data');
-  document.getElementById('tab-member').classList.toggle('active', tab === 'member');
-  document.getElementById('panel-data').style.display   = tab === 'data'   ? 'block' : 'none';
-  document.getElementById('panel-member').style.display = tab === 'member' ? 'block' : 'none';
-  if (tab === 'member') renderMemberList();
+  document.getElementById('tab-data').classList.toggle('active',    tab === 'data');
+  document.getElementById('tab-member').classList.toggle('active',  tab === 'member');
+  document.getElementById('tab-subwork').classList.toggle('active', tab === 'subwork');
+  document.getElementById('panel-data').style.display    = tab === 'data'    ? 'block' : 'none';
+  document.getElementById('panel-member').style.display  = tab === 'member'  ? 'block' : 'none';
+  document.getElementById('panel-subwork').style.display = tab === 'subwork' ? 'block' : 'none';
+  if (tab === 'member')  renderMemberList();
+  if (tab === 'subwork') renderSubWorkList();
 }
 
 /* ============================================================
