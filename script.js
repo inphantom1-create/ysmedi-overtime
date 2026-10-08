@@ -55,8 +55,25 @@ function getAttendance() {
 /* ============================================================
    토/일/공휴일 여부 확인 (2025~2026 대체공휴일 포함)
    ============================================================ */
+// 대체근무일 목록 (관리자 등록, GAS에서 로드)
+let _subWorkDays = [];
+try { const s = localStorage.getItem('overtime_subwork'); if (s) _subWorkDays = JSON.parse(s) || []; } catch(e) {}
+
+function loadSubWorkDays() {
+  return gasRequest({ action: 'getSubWorkDays', password: ADMIN_PASSWORD })
+    .then(res => {
+      if (res && res.success) {
+        _subWorkDays = (res.days || []).map(d => d.date);
+        try { localStorage.setItem('overtime_subwork', JSON.stringify(_subWorkDays)); } catch(e) {}
+        calcOvertime();
+      }
+    })
+    .catch(() => {});
+}
+
 function isWeekendOrHolidayJS(dateStr) {
   if (!dateStr) return false;
+  if (_subWorkDays.includes(dateStr)) return false; // 대체근무일 = 평일 처리
   const d   = new Date(dateStr);
   const dow = d.getDay(); // 0=일, 6=토
   if (dow === 0 || dow === 6) return true;
@@ -394,6 +411,7 @@ function addSubWorkDay() {
         document.getElementById('sub-date').value = '';
         document.getElementById('sub-memo').value = '';
         renderSubWorkList();
+        loadSubWorkDays();
         showToast(`✅ ${date} 대체근무일이 등록되었습니다.`, '');
       } else {
         errEl.textContent = (res && res.error) ? res.error : '추가 실패';
@@ -409,6 +427,7 @@ function deleteSubWorkDay(rowIndex, date) {
     .then(res => {
       if (res && res.success) {
         renderSubWorkList();
+        loadSubWorkDays();
         showToast(`🗑️ "${date}" 대체근무일이 삭제되었습니다.`, '');
       } else {
         showToast((res && res.error) ? res.error : '삭제 실패', 'error');
@@ -443,6 +462,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sub-dinner').className   = 'chk-sub off';
 
   refreshNameSelect();
+  loadSubWorkDays();
   document.getElementById('btn-submit').addEventListener('click', submitForm);
   ['start-time','end-time'].forEach(id =>
     document.getElementById(id).addEventListener('change', calcOvertime));
