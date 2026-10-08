@@ -226,8 +226,9 @@
   <main id="page-admin" class="page">
     <div class="container">
       <div class="tab-row">
-        <button class="tab-btn active" id="tab-data"   onclick="switchTab('data')">📋 신청 내역</button>
-        <button class="tab-btn"        id="tab-member" onclick="switchTab('member')">👤 신청인 관리</button>
+        <button class="tab-btn active" id="tab-data"    onclick="switchTab('data')">📋 신청 내역</button>
+        <button class="tab-btn"        id="tab-member"  onclick="switchTab('member')">👤 신청인 관리</button>
+        <button class="tab-btn"        id="tab-subwork" onclick="switchTab('subwork')">📅 대체근무일</button>
       </div>
 
       <!-- 신청 내역 탭 -->
@@ -312,6 +313,30 @@
         <div class="card">
           <h2 class="card-title">신청인 목록</h2>
           <div id="member-list"></div>
+        </div>
+      </div>
+
+      <!-- 대체근무일 관리 탭 -->
+      <div id="panel-subwork" style="display:none;">
+        <div class="card">
+          <h2 class="card-title">대체근무일 추가</h2>
+          <p class="info-text" style="margin-bottom:10px;">공휴일·주말이지만 정규 근무일로 처리할 날짜를 등록합니다.<br>등록된 날짜는 시간외 근무 계산 시 평일로 간주됩니다.</p>
+          <div class="field-row">
+            <div class="field flex1">
+              <label class="label" for="sub-date">날짜 <span class="required">*</span></label>
+              <input class="input" type="date" id="sub-date" />
+            </div>
+            <div class="field flex2">
+              <label class="label" for="sub-memo">메모</label>
+              <input class="input" type="text" id="sub-memo" placeholder="예) 10월 9일 대체근무" maxlength="50" />
+            </div>
+            <button class="btn-add-member" onclick="addSubWorkDay()">+ 추가</button>
+          </div>
+          <span class="field-error" id="err-subwork"></span>
+        </div>
+        <div class="card">
+          <h2 class="card-title">대체근무일 목록</h2>
+          <div id="subwork-list"></div>
         </div>
       </div>
 
