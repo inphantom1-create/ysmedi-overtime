@@ -65,10 +65,17 @@ function loadSubWorkDays() {
       if (res && res.success) {
         _subWorkDays = (res.days || []).map(d => d.date);
         try { localStorage.setItem('overtime_subwork', JSON.stringify(_subWorkDays)); } catch(e) {}
+        updateVersionLabel();
         calcOvertime();
       }
     })
     .catch(() => {});
+}
+
+const APP_VERSION = 'v8.9.1';
+function updateVersionLabel() {
+  const el = document.getElementById('app-version');
+  if (el) el.textContent = `${APP_VERSION} · 대체근무일 ${_subWorkDays.length}건 적용`;
 }
 
 function isWeekendOrHolidayJS(dateStr) {
@@ -473,7 +480,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('char-count').textContent =
       `${document.getElementById('reason').value.length} / 500`;
   });
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  // 버전 표시 (대체근무일 수 포함) — 폰에서 최신 버전인지 확인용
+  updateVersionLabel();
+  if ('serviceWorker' in navigator) {
+    // 새 서비스워커가 적용되면 한 번 자동 새로고침 → 최신 화면 즉시 반영
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !reloaded) { reloaded = true; location.reload(); }
+    });
+    navigator.serviceWorker.register('sw.js').then(r => r.update()).catch(()=>{});
+  }
   calcOvertime();
 });
 
