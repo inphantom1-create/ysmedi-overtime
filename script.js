@@ -681,6 +681,7 @@ async function confirmOverwrite() {
     const result = await gasRequest({
       ...payload,
       action:   'overwrite',
+      password: ADMIN_PASSWORD,
       rowIndex: rowIndex,
     });
     if (result && result.success) {
