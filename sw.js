@@ -1,4 +1,4 @@
-const CACHE_NAME = 'overtime-v8.8.0';
+const CACHE_NAME = 'overtime-v8.8.1';
 
 const STATIC_ASSETS = [
   './',
