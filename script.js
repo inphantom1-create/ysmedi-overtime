@@ -72,7 +72,7 @@ function loadSubWorkDays() {
     .catch(() => {});
 }
 
-const APP_VERSION = 'v8.9.1';
+const APP_VERSION = 'v8.9.2';
 function updateVersionLabel() {
   const el = document.getElementById('app-version');
   if (el) el.textContent = `${APP_VERSION} · 대체근무일 ${_subWorkDays.length}건 적용`;
@@ -682,8 +682,8 @@ async function submitForm() {
     setLoading(false); _isSubmitting = false;
   } catch(err) {
     if (err.message.includes('시간 초과')) {
-      showToast('⚠️ 응답이 느립니다. 저장은 완료됐을 수 있어요.', '', 5000);
-      resetForm();
+      // 폼을 초기화하지 않음: 재신청해도 서버가 중복으로 안내함 (이중 저장 방지)
+      showToast('⚠️ 응답이 느립니다. 저장됐을 수 있으니 관리자 화면에서 확인 후 필요 시 다시 신청하세요.', '', 6000);
     } else {
       showToast('❌ 오류: ' + err.message, 'error');
     }
